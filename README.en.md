@@ -2,7 +2,7 @@
 
 > [中文](README.md)
 
-erikwang2013/industrial-protocols-ethercat — Bridge implementation, category: Hardware-Dependent (Bridge).
+EtherCAT 协议包 — 需 Beckhoff TwinCAT/SOEM 桥接。Requires dedicated hardware, bridged to vendor SDK or gateway via kernel Bridge layer.
 
 ## Installation
 
@@ -10,46 +10,50 @@ erikwang2013/industrial-protocols-ethercat — Bridge implementation, category: 
 composer require erikwang2013/industrial-protocols-kernel erikwang2013/industrial-protocols-ethercat
 ```
 
-> This package depends on [erikwang2013/industrial-protocols-kernel](https://github.com/erikwang2013/industrial-protocols), which provides connection management, protocol registry, coroutine adaptation, event system and more.
+> Depends on [erikwang2013/industrial-protocols-kernel](https://github.com/erikwang2013/industrial-protocols-kernel) for hardware bridge layer, connection management, and protocol registry.
+
+## Design
+
+EtherCAT (Ethernet for Control Automation Technology) is a real-time industrial Ethernet protocol developed by Beckhoff. Slaves use ESC (EtherCAT Slave Controller) dedicated chips (e.g. ET1100/ET1200) implementing on-the-fly processing at the hardware layer — frames are processed as they pass through each slave without software intervention. Pure PHP cannot implement an EtherCAT master protocol stack — external SDK bridging (TwinCAT ADS or SOEM) is required. This package wraps BridgeConnector, mapping EtherCAT protocol interfaces to BridgeInterface for unified ConnectorInterface access.
+
+## Architecture
+
+Bridge mode: BridgeConnector (implements ConnectorInterface) → BridgeInterface (open/close/execute/isReady) → ExternalProcessBridge (local SDK subprocess via proc_open stdin/stdout) or TcpGatewayBridge (remote gateway via TCP/UDP Socket). Applications use ConnectionManager for unified connect/read/write/getHealth calls.
+
+## Supported Frameworks
+
+Compatible with 6 PHP runtimes via kernel framework adapters: Laravel (ServiceProvider+Facade+artisan), Webman (config/plugin auto-discovery+ProtocolProcess), Hyperf (ConfigProvider+DI+KernelFactory), ThinkPHP (services.php+IndustrialProtocolsService), Yii2 (Bootstrap+component), Plain PHP (direct Kernel instantiation)
 
 ## Usage
 
 ```php
 use Erikwang2013\IndustrialProtocols\Kernel;
-$kernel = new Kernel(['config_path' => __DIR__ . '/industrial-protocols.php']);
+use IndustrialProtocols\Bridge\TcpGatewayBridge;
+
+$kernel = new Kernel(['config_path' => __DIR__ . '/config.php']);
 $kernel->boot();
 
-// Connect via ConnectionManager
-$conn = $kernel->getConnectionManager()->connect('device-id');
+// Via TCP gateway
+$bridge = new TcpGatewayBridge('192.168.1.200', 502);
+$conn = $kernel->getConnectionManager()->connect('device-id', [
+    'protocol' => 'ethercat', 'bridge' => $bridge,
+]);
 $result = $conn->read('address');
+
+// Via vendor factory
+$bridge = $kernel->getVendorBridgeFactory()->create('beckhoff', 'CX2030', '3.1');
 ```
 
-> This package depends on [erikwang2013/industrial-protocols-kernel](https://github.com/erikwang2013/industrial-protocols), which provides connection management, protocol registry, coroutine adaptation, event system and more.
+## Adapter Vendors
 
-## Features
-
-通过 BridgeInterface 桥接至厂商 C/C++ SDK 或网关硬件(ExternalProcessBridge / TcpGatewayBridge)，实现 6 个 SDK 接口，由 BridgeConnector 统一代理。
-
-## Architecture
-
-Bridge 桥接模式：BridgeConnector 实现 ConnectorInterface，内部委托给 BridgeInterface(open/close/execute/isReady)。支持 ExternalProcessBridge(本地SDK子进程,proc_open)和 TcpGatewayBridge(远程网关TCP)。
-
-## Protocol Support
-
-需对应厂商 SDK 或网关硬件(Anybus/Hilscher/Moxa 等，参见 docs/vendors.md)
+Beckhoff (TwinCAT 3, CX2030/5140, EK1100/1501), Hilscher (netX 90/4000, cifX RE), HMS/Anybus (EtherCAT Slave)
 
 ## Requirements
 
 - PHP >= 8.1
 - Composer
 - erikwang2013/industrial-protocols-kernel
-
-## License
-
-MIT — Copyright (c) 2026 erik <erik@erik.xyz> — https://erik.xyz
-
-
----
+- EtherCAT Master (Beckhoff TwinCAT 3 / SOEM (Simple Open EtherCAT Master) open-source library)
 
 ## Related Links
 
@@ -57,3 +61,6 @@ MIT — Copyright (c) 2026 erik <erik@erik.xyz> — https://erik.xyz
 - [Kernel](https://github.com/erikwang2013/industrial-protocols-kernel)
 - [All 42 Protocol Packages](https://github.com/erikwang2013/industrial-protocols#supported-protocols)
 
+## License
+
+MIT — Copyright (c) 2026 erik <erik@erik.xyz> — https://erik.xyz
