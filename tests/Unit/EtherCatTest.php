@@ -16,7 +16,7 @@ class EtherCatTest extends TestCase
     {
         $p = new EtherCatProtocol();
         $this->assertSame('ethercat', $p->getName());
-        $this->assertSame('1.0.0', $p->getVersion());
+        $this->assertSame('1.1.1', $p->getVersion());
         $this->assertContains('bridge', $p->getSupportedVariants());
     }
 
